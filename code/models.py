@@ -19,6 +19,7 @@ from config import (
     NB_EPOCHS
 )
 
+IMG_SIZE = 768
 from tensorflow.keras.callbacks import (
     ModelCheckpoint,
     LearningRateScheduler,
@@ -197,7 +198,13 @@ def main():
         plt.savefig(f'{i}.png')
 
 
-def predict():
+def load_from_path(weight_file_path):
+    seg_model = make_model((1, IMG_SIZE, IMG_SIZE, 3))
+    seg_model.load_weights(weight_file_path)
+    return seg_model
+
+
+def predict(weight_file_path):
     from data_process import (
         gen_data,
         create_aug_gen,
@@ -205,23 +212,8 @@ def predict():
     )
     train_data, val_data = gen_data()
     valid_x, valid_y = next(make_image_gen(train_data, VALID_IMG_COUNT))
-    seg_model = load_model(
-        weight_path,
-        custom_objects={
-            'dice_p_bce': dice_p_bce,
-            'dice_coef': dice_coef,
-            'true_positive_rate': true_positive_rate,
-            'IoU': IoU,
-        }
-    )
-    # seg_model = load_model(
-    #     weight_path,
-    #     custom_objects={
-    #         'IoU': IoU,
-    #     }
-    # )
-    weights="../models/{}_iou_weights.orig.hdf5".format('seg_model')
-    seg_model.load_weights(weights)
+
+
     pred_y = seg_model.predict(valid_x)
     import ipdb; ipdb.set_trace()
     for i in range(400):
@@ -236,6 +228,6 @@ def predict():
         plt.savefig(f'../data/predictions/{i}.png')
 
 
-if __name__ == '__main__':
-    # main()
-    predict()
+# if __name__ == '__main__':
+#     # main()
+#     # predict()
