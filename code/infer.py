@@ -44,7 +44,7 @@ class Infer:
           for item in items:
             images = self.prepare_dataset(item['tiles'], item['id'])
             predictions = self.model.predict(images)
-            columns, rows = [elem[1] - elem[0] for elem in dataset['tiles']]
+            columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
             predictions = predictions.reshape((rows, columns, IMG_SIZE, IMG_SIZE))
             # insert here
 
