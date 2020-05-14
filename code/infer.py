@@ -53,6 +53,7 @@ class Infer:
             pred_list = self.xy_to_latlon(
               predictions, rows, columns, item['coordinates']
             )
+            self.prepare_geojson(pred_list)
 
     def prepare_dataset(self, tile_range, tile_id):
         x_indices, y_indices = tile_range
@@ -73,8 +74,16 @@ class Infer:
         return np.asarray(images)
 
 
-    def prepare_geojson(self):
-        pass
+    def prepare_geojson(self, points_list):
+      prediction_geojson = {
+          "TYPE": "MultiPoint",
+          "coordinates": [],
+      }
+      for points in points_list:
+        for point in zip(*points_list):
+          prepare_geojson['coordinates'].append(list(point))
+      return prediction_geojson
+
 
     def xy_to_latlon(self, grid_list, rows, cols, bounds):
         transform = rasterio.transform.from_bounds(
