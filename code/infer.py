@@ -1,25 +1,38 @@
 import mercantile
+import json
 import requests
 import numpy as np
 import rasterio
 
-from models import load_from_path
+from config import (
+    EXTENTS,
+    IMG_SIZE,
+    THRESHOLD,
+    TILE_SIZE,
+    ZOOM_LEVEL
+)
+
+from copy import deepcopy
 from io import BytesIO
+from models import load_from_path
+
 from PIL import Image
 from planet_downloader import PlanetDownloader
 from skimage.measure import regionprops
 
-EXTENTS = {
-  'san_fran': [-123.43, 37.71, -123.30, 37.85]
-}
 
-THRESHOLD = 0.5
 WEIGHT_FILE = '../weights/iou_model.hdf5'
-ZOOM_LEVEL = 14
-IMG_SIZE = 768
-TILE_SIZE = 256
-WMTS_URL = f"https://tiles1.planet.com/data/v1/PSScene3Band/{{}}/{ZOOM_LEVEL}/{{}}/{{}}.png?api_key={{}}"
 
+
+WMTS_URL = f"https://tiles1.planet.com/data/v1/PSScene3Band/{{}}/{ZOOM_LEVEL}/{{}}/{{}}.png?api_key={{}}"
+GEOJSON_TEMPLATE = {
+    "type": "Feature",
+    "properties": {},
+    "geometry": {
+        "type": "Polygon",
+        "coordinates": []
+    }
+}
 
 class Infer:
 
@@ -40,30 +53,35 @@ class Infer:
 
 
     def infer(self):
+        detections = list()
         for location, extent  in EXTENTS.items():
-
-          items = self.planet_downloader.search_ids(
-            extent, self.start_date_time, self.end_date_time
-          )
-          for item in items:
-            images = self.prepare_dataset(item['tiles'], item['id'])
-            predictions = self.model.predict(images)
-            columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
-            predictions = predictions.reshape((rows, columns, IMG_SIZE, IMG_SIZE))
-            pred_list = self.xy_to_latlon(
-              predictions, rows, columns, item['coordinates']
+            items = self.planet_downloader.search_ids(
+                extent, self.start_date_time, self.end_date_time
             )
-            self.prepare_geojson(pred_list)
+            for item in items:
+                images = self.prepare_dataset(item['tiles'], item['id'])
+                predictions = self.model.predict(images)
+                columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
+                predictions = predictions.reshape((rows, columns, IMG_SIZE, IMG_SIZE))
+                polygons = self.xy_to_latlon(
+                    predictions, rows, columns, item['coordinates']
+                )
+                detections.extend(polygons)
+        return { "type": "FeatureCollection", "features": detections }
 
     def prepare_dataset(self, tile_range, tile_id):
         x_indices, y_indices = tile_range
         images = list()
+        x = 0
         for x_index in list(range(*x_indices)):
+          y = 0
+          x += 1
           for y_index in list(range(*y_indices)):
+            print(x, y, WMTS_URL.format(tile_id, x_index, y_index, self.credential))
+            y += 1
             response = requests.get(
               WMTS_URL.format(tile_id, x_index, y_index, self.credential)
             )
-
             response.raise_for_status()
             img = np.asarray(
               Image.open(BytesIO(response.content)).resize(
@@ -74,31 +92,30 @@ class Infer:
         return np.asarray(images)
 
 
-    def prepare_geojson(self, points_list):
-      prediction_geojson = {
-          "TYPE": "MultiPoint",
-          "coordinates": [],
-      }
-      for points in points_list:
-        for point in zip(*points_list):
-          prepare_geojson['coordinates'].append(list(point))
-      return prediction_geojson
+    def prepare_geojson(self, coordinates):
+        geojson = deepcopy(GEOJSON_TEMPLATE)
+        geojson['geometry']['coordinates'] = coordinates
+        return geojson
 
 
     def xy_to_latlon(self, grid_list, rows, cols, bounds):
         transform = rasterio.transform.from_bounds(
-          *bounds, TILE_SIZE * cols, TILE_SIZE * rows
+            *bounds, TILE_SIZE * cols, TILE_SIZE * rows
         )
-        new_xs = list()
-        new_ys = list()
-        for row in range(rows):
-            for col in range(cols):
-                if grid_list[row][col].max() >= THRESHOLD:
-                  segments = (grid_list[row][col] > THRESHOLD).astype('uint8')
-                  for idx, ship in enumerate(regionprops(segments)):
-                      x, y = (int(np.average([ship.bbox[0], ship.bbox[2]])),
-                              int(np.average([ship.bbox[1], ship.bbox[3]])))
-                      new_xs.append((col * 256) + x)
-                      new_ys.append((row * 256) + y)
-        latlon_grid_list = rasterio.transform.xy(transform, new_ys, new_xs)
-        return latlon_grid_list
+        polygon_coordinates = list()
+        rows, colms, _, _ = np.where(grid_list >= THRESHOLD)
+        for row, col in set(zip(rows, colms)):
+            segments = (grid_list[row][col] > THRESHOLD).astype('uint8')
+            for idx, ship in enumerate(regionprops(segments)):
+                print(row, col)
+                bbox = ship.bbox
+                xs = bbox[::2]
+                ys = bbox[1::2]
+                lons, lats = rasterio.transform.xy(
+                    transform, (col * TILE_SIZE) + xs, (row * TILE_SIZE) + ys
+                )
+                reformated_bbox = self.planet_downloader.prepare_coordinates(
+                    [lons[0], lats[0], lons[1], lats[1]]
+                )
+                polygon_coordinates.append(self.prepare_geojson(reformated_bbox))
+        return polygon_coordinates

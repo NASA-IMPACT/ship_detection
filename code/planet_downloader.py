@@ -4,7 +4,9 @@ import pyproj
 import mercantile
 import numpy as np
 
-SEARCH_URL = 'https://api.planet.com/data/v1/quick-search'
+from config import ZOOM_LEVEL
+
+
 BODY = {
     "filter": {
         "type": "AndFilter",
@@ -28,7 +30,7 @@ BODY = {
     "item_types": ["PSScene3Band"]
 }
 
-ZOOM_LEVEL = 14 # pixel resolution == 0.0032 m
+SEARCH_URL = 'https://api.planet.com/data/v1/quick-search'
 
 class PlanetDownloader:
 
