@@ -1,12 +1,11 @@
 import matplotlib
-matplotlib.use('agg')
 import numpy as np
 import matplotlib.pyplot as plt
-import tensorflow.keras.backend as K
-from tensorflow.keras import models, layers
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.losses import binary_crossentropy
-from tensorflow.keras.models import load_model
+import keras.backend as K
+from keras import models, layers
+from keras.optimizers import Adam
+from keras.losses import binary_crossentropy
+from keras.models import load_model
 from config import (
     UPSAMPLE_MODE,
     NET_SCALING,
@@ -20,7 +19,7 @@ from config import (
 )
 
 IMG_SIZE = 768
-from tensorflow.keras.callbacks import (
+from keras.callbacks import (
     ModelCheckpoint,
     LearningRateScheduler,
     EarlyStopping,
@@ -51,6 +50,67 @@ def upsample_conv(filters, kernel_size, strides, padding):
 def upsample_simple(filters, kernel_size, strides, padding):
     return layers.UpSampling2D(strides)
 
+
+def make_model_rcnn():
+    from mrcnn.config import Config
+    from mrcnn import utils
+    import mrcnn.model as modellib
+    from mrcnn import visualize
+    from mrcnn.model import log
+
+    model_path = '../../ship_detection_2/data/mask_rcnn_airbus_0022.h5'
+    class DetectorConfig(Config):
+        # Give the configuration a recognizable name
+        NAME = 'airbus'
+
+        GPU_COUNT = 1
+        IMAGES_PER_GPU = 9
+
+        BACKBONE = 'resnet50'
+
+        NUM_CLASSES = 2  # background and ship classes
+
+        IMAGE_MIN_DIM = 384
+        IMAGE_MAX_DIM = 384
+        RPN_ANCHOR_SCALES = (4, 8, 16, 32, 64)
+        TRAIN_ROIS_PER_IMAGE = 64
+        MAX_GT_INSTANCES = 14
+        DETECTION_MAX_INSTANCES = 10
+        DETECTION_MIN_CONFIDENCE = 0.95
+        DETECTION_NMS_THRESHOLD = 0.0
+
+        STEPS_PER_EPOCH = 15
+        VALIDATION_STEPS = 10
+
+        ## balance out losses
+        LOSS_WEIGHTS = {
+            "rpn_class_loss": 30.0,
+            "rpn_bbox_loss": 0.8,
+            "mrcnn_class_loss": 6.0,
+            "mrcnn_bbox_loss": 1.0,
+            "mrcnn_mask_loss": 1.2
+        }
+
+    class InferenceConfig(DetectorConfig):
+        GPU_COUNT = 1
+        IMAGES_PER_GPU = 1
+
+    import tensorflow as tf
+    inference_config = InferenceConfig()
+
+    # Recreate the model in inference mode
+    model = modellib.MaskRCNN(mode='inference',
+                              config=inference_config,
+                              model_dir='../data/')
+    model.load_weights(model_path, by_name=True)
+
+    return model
+
+
+def predict_rcnn(model, img):
+    import ipdb; ipdb.set_trace();
+    prediction = model.detect([img])
+    return prediction['masks'] * 255
 
 def make_model(input_shape):
     if UPSAMPLE_MODE == 'DECONV':

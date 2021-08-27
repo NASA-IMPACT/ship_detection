@@ -17,7 +17,7 @@ NB_EPOCHS = 500
 
 # downsampling inside the network
 NET_SCALING = None
-PATH = '../data/airbus-ship-detection/'
+PATH = '../../ship_detection_2/data/airbus-ship-detection/'
 PRETRAINED = PATH + 'fine-tuning-resnet34-on-ship-detection/models/Resnet34_lable_256_1.h5'
 SEGMENTATION_PATH = PATH + 'train_ship_segmentations_v2.csv'
 TEST_PATH = PATH + 'test_v2/'
@@ -25,7 +25,11 @@ THRESHOLD = 0.5
 TILE_SIZE = 256
 TRAIN_PATH = PATH + 'train_v2/'
 UPSAMPLE_MODE = 'SIMPLE'
+WATERBODY_JSON = '../../ship_detection_2/data/stanford-sf-geojson.geojson'
 
+IMG_DIM = 768
+THRESHOLD = 0.5
 # number of validation images to use
 VALID_IMG_COUNT = 900
 ZOOM_LEVEL = 14  # 16 is in pixel resolution == 2.4m
+

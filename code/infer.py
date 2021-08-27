@@ -64,6 +64,7 @@ class Infer:
             for item in items:
                 images = self.prepare_dataset(item['tiles'], item['id'])
                 predictions = self.model.predict((images / 255.))
+                import ipdb; ipdb.set_trace()
                 columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
                 predictions = predictions.reshape((rows, columns, IMG_SIZE, IMG_SIZE))
                 images = images.reshape((rows, columns, IMG_SIZE, IMG_SIZE, 3))
@@ -122,4 +123,7 @@ class Infer:
             img.save(f"{row}_{col}.png")
             print(f"{row}_{col}.png")
         return polygon_coordinates
+
+if __name__ == '__main__':
+  i = Infer('2020-04-10', credential='e8a0168a1ffc48ebad7fac2070ca9bf0').infer()
 

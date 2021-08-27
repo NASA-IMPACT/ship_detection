@@ -10,7 +10,7 @@ import rasterio
 import matplotlib.pyplot as plt
 
 from rasterio import windows
-from tensorflow.keras.models import load_model
+from keras.models import load_model
 from glob import glob
 from osgeo import gdal, osr, ogr
 from rasterio.warp import calculate_default_transform, reproject, Resampling
@@ -26,7 +26,8 @@ from models import (
     dice_coef,
     true_positive_rate,
     IoU,
-    make_model
+    make_model_rcnn,
+    predict_rcnn,
 )
 from config import (
     WATERBODY_JSON,
@@ -50,8 +51,11 @@ def predict(tif_path, model):
     transform = osr.CoordinateTransformation(ds_srs, geogcs)
     reshaped_img = np.moveaxis(img[:-1, :, :], 0, -1)
     if reshaped_img.shape == (IMG_DIM, IMG_DIM, 3):
-        segments = model.predict(
-            np.expand_dims(reshaped_img, 0)
+        # segments = model.predict(
+        #     np.expand_dims(reshaped_img, 0)
+        # )[0, :, :, 0]
+        segments = predict_rcnn(
+            model, np.expand_dims(reshaped_img, 0)[0]
         )[0, :, :, 0]
         # plt.imshow(segments)
         # plt.savefig(tif_path[:-4] + '.png')
@@ -210,10 +214,10 @@ def visualize_prediction(tif_image, predict_json, save_path):
     plt.savefig(save_path, dpi=1000)
 
 
-# if __name__ == '__main__':
-#     seg_model = make_model((1, IMG_DIM, IMG_DIM, 3))
-#     seg_model.load_weights('../models/seg_model_weights.best.hdf5')
-#     jsons = get_predictions('../data/sf_2.tif', seg_model)
-#     jsons = join_geojsons(jsons)
-#     visualize_prediction('../data/sf_2.tif', jsons, 'test2.png')
-#     # print(jsons)
+if __name__ == '__main__':
+    rcnn_model = make_model_rcnn()
+    # seg_model.load_weights('../models/seg_model_weights.best.hdf5')
+    jsons = get_predictions('../../ship_detection_2/data/sf_2.tif', rcnn_model)
+    jsons = join_geojsons(jsons)
+    visualize_prediction('../../ship_detection_2/data/sf_2.tif', jsons, 'test2.png')
+    # print(jsons)
