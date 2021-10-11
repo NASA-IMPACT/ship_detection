@@ -190,20 +190,38 @@ def predict(tif_path, model):
             predict_json['coordinates'].append(zipped_coords)
     return gen_geojson(predict_json, tif_path)
 
-            # Get global coordinates from pixel x, y coords
-            projected_x = a * y + b * x + xoff
-            projected_y = d * y + e * x + yoff
+def save_preds(img, preds):
+    plt.imshow(img)
+    plt.imshow(preds, alpha=0.5)
+    plt.savefig('test.png')
+    plt.close()
 
-            # Transform from projected x, y to geographic lat, lng
-            (lat, lng, elev) = transform.TransformPoint(
-                projected_x, projected_y
-            )
+def gen_geojson(predict_json):
 
-            # Add ship to results cluster
-            predict_json['coordinates'].append([lng, lat])
+    #tif_path = os.path.basename(tif_path)
+    # rowcol, date = tif_path.split('_')
+    # date = date.split('T')[0]
+    geojson_schema = {
+                  "type": "FeatureCollection",
+                  "features": []
+    }
+    for idx, detection in enumerate(predict_json['coordinates']):
 
-    return filter_predictions(predict_json)
+        #geojson_path = f'./shapes/{idx}_{rowcol}'
+        geojson_schema['features'] = [
+            {
+                "type": "Feature",
+                "properties": {},
+                "geometry": {
+                    "type":"Polygon",
+                    "coordinates": [detection]
+                }
+            }
+        ]
 
+        # with open(f'{geojson_path}.geojson', 'w') as shapefile:
+        #     json.dump(geojson_schema, shapefile)
+    return geojson_schema
 
 def filter_predictions(predict_json, tif_path):
     # if predict_json['coordinates'] != []:
@@ -258,13 +276,6 @@ def filter_predictions(predict_json, tif_path):
                         ]
                         ]
                     ]
-            # shapefile.write({
-            #     'geometry': {'type':'Polygon', 'coordinates': poly} , 'properties': {}}
-            # )
-            # file_list = glob(f'{shapefile_path}.*')
-            # zipObj = ZipFile(f'{shapefile_path}.zip', 'w')
-            # [zipObj.write(file, os.path.basename(file)) for file in file_list]
-            # zipObj.close()
             print('poly', poly)
             geojson_schema['features'] = [{"type": "Feature",
                     "properties": {},'geometry': {'type':'Polygon', 'coordinates': predict_json['coordinates']}}]
@@ -401,7 +412,7 @@ def get_tiles(ds, width, height):
 
 def join_geojsons(json_list):
     predict_json = {
-        "TYPE": "MultiPoint",
+        "TYPE": "MultiPolygon",
         "coordinates": [],
     }
     for item in json_list:
@@ -475,8 +486,4 @@ def visualize_prediction(tif_image, predict_json, save_path):
 
 if __name__ == '__main__':
     rcnn_model = make_model_rcnn()
-    # seg_model.load_weights('../models/seg_model_weights.best.hdf5')
-    jsons = get_predictions('../../ship_detection_2/data/sf_2.tif', rcnn_model)
-    jsons = join_geojsons(jsons)
-    visualize_prediction('../../ship_detection_2/data/sf_2.tif', jsons, 'test2.png')
-    # print(jsons)
+    jsons = get_predictions('files/PSScene3Band/20210412_083128_05_2307/visual/20210412_083128_05_2307_3B_Visual.tif', rcnn_model)
