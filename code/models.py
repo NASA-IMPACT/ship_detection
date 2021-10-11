@@ -2,6 +2,7 @@ import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt
 import keras.backend as K
+
 from keras import models, layers
 from keras.optimizers import Adam
 from keras.losses import binary_crossentropy
@@ -15,10 +16,10 @@ from config import (
     MAX_TRAIN_STEPS,
     BATCH_SIZE,
     VALID_IMG_COUNT,
-    NB_EPOCHS
+    NB_EPOCHS,
+    IMG_SIZE
 )
 
-IMG_SIZE = 768
 from keras.callbacks import (
     ModelCheckpoint,
     LearningRateScheduler,
@@ -58,7 +59,7 @@ def make_model_rcnn():
     from mrcnn import visualize
     from mrcnn.model import log
 
-    model_path = '../../ship_detection_2/data/mask_rcnn_airbus_0022.h5'
+    model_path = '../mask_rcnn_airbus_0022.h5'
     class DetectorConfig(Config):
         # Give the configuration a recognizable name
         NAME = 'airbus'
@@ -72,7 +73,7 @@ def make_model_rcnn():
 
         IMAGE_MIN_DIM = 384
         IMAGE_MAX_DIM = 384
-        RPN_ANCHOR_SCALES = (4, 8, 16, 32, 64)
+        RPN_ANCHOR_SCALES = (8, 16, 32, 64)
         TRAIN_ROIS_PER_IMAGE = 64
         MAX_GT_INSTANCES = 14
         DETECTION_MAX_INSTANCES = 10
@@ -93,7 +94,7 @@ def make_model_rcnn():
 
     class InferenceConfig(DetectorConfig):
         GPU_COUNT = 1
-        IMAGES_PER_GPU = 1
+        IMAGES_PER_GPU = 9
 
     import tensorflow as tf
     inference_config = InferenceConfig()
@@ -108,9 +109,15 @@ def make_model_rcnn():
 
 
 def predict_rcnn(model, img):
-    import ipdb; ipdb.set_trace();
-    prediction = model.detect([img])
-    return prediction['masks'] * 255
+    predictions = model.detect(img)
+    masks =  [pred['masks'] for pred in predictions]
+    appended_masks = []
+    for mask in masks:
+        if mask.shape[2] == 0:
+            appended_masks.append(np.zeros((mask.shape[0], mask.shape[1])))
+        else:
+            appended_masks.append((np.sum(mask, axis=-1) > 0) * 255)
+    return appended_masks
 
 def make_model(input_shape):
     if UPSAMPLE_MODE == 'DECONV':
