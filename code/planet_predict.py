@@ -56,6 +56,18 @@ from config import (
 )
 
 
+def read_resize_img(tif_path, dim=(768, 768)):
+    """
+    tif_path: location of image to read and resize
+    dim: dimension to resize to
+    returns: resized image
+    """
+    ds = rasterio.open(tif_path, 'r')
+    img = ds.read([1, 2, 3]) # just read first three bands
+    img = np.moveaxis(img, 0, -1)
+    return (cv2.resize(img, dim), ds.meta)
+
+
 def predict(tif_path, model):
 
     predict_json = {
