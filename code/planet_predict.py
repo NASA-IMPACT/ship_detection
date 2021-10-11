@@ -393,8 +393,8 @@ def get_tiles(ds, width, height):
         window = windows.Window(
             col_off=col_off,
             row_off=row_off,
-            width=width,
-            height=height).intersection(big_window)
+            width=int(width),
+            height=int(height)).intersection(big_window)
         transform = windows.transform(window, ds.transform)
         yield window, transform
 
