@@ -153,33 +153,42 @@ def mask_to_geojson(segment, meta):
 def predict(tif_path, model):
 
     predict_json = {
-        "TYPE": "MultiPoint",
+        "TYPE": "MultiPolygon",
         "coordinates": [],
     }
-    ds = gdal.Open(tif_path)
-    img = ds.ReadAsArray()
-    xoff, a, b, yoff, d, e = ds.GetGeoTransform()
-    ds_proj = ds.GetProjectionRef()
-    ds_srs = osr.SpatialReference(ds_proj)
-    geogcs = ds_srs.CloneGeogCS()
-    transform = osr.CoordinateTransformation(ds_srs, geogcs)
-    reshaped_img = np.moveaxis(img[:-1, :, :], 0, -1)
-    if reshaped_img.shape == (IMG_DIM, IMG_DIM, 3):
-        # segments = model.predict(
-        #     np.expand_dims(reshaped_img, 0)
-        # )[0, :, :, 0]
-        segments = predict_rcnn(
-            model, np.expand_dims(reshaped_img, 0)[0]
-        )[0, :, :, 0]
-        # plt.imshow(segments)
-        # plt.savefig(tif_path[:-4] + '.png')
-        segments = (segments > THRESHOLD).astype('uint8')
+    ds = rasterio.open(tif_path, 'r')
+    img = ds.read([1, 2, 3]) # just read first three bands
+    w_0, h_0 = img.shape[1:] # preserve original width, height
+    img = np.moveaxis(img, 0, -1)
+    reshaped_img = cv2.resize(img,(IMG_DIM, IMG_DIM))
 
-        for idx, ship in enumerate(regionprops(segments)):
+    if reshaped_img.shape == (IMG_DIM, IMG_DIM, 3):
+
+        segments = predict_rcnn(
+            model, np.expand_dims(reshaped_img, 0)
+        )
+        segments = (segments > 125).astype('uint8')
+        segments = cv2.resize(segments, (w_0, h_0))  # reshape to original
+        contours = cv2.findContours(segments,  cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = contours[0] if len(contours) == 2 else contours[1]
+        for idx, contour in enumerate(contours):
 
             #if (ship.area >= SHIP_AREA_MIN and ship.area <= SHIP_AREA_MAX):
-            x, y = (int(np.average([ship.bbox[0], ship.bbox[2]])),
-                    int(np.average([ship.bbox[1], ship.bbox[3]])))
+            rect = cv2.minAreaRect(contour)
+            box = cv2.boxPoints(rect)
+            box = [[y, x] for x, y in box]
+            boxpoints = zip(*box)
+            xs, ys = rasterio.transform.xy(ds.transform, *boxpoints)
+            lats, lons = fiona.transform.transform(
+                ds.crs.to_proj4(),
+                '+init=epsg:4326',
+                xs,
+                ys
+            )
+            zipped_coords = [[lat, lon] for lat, lon in zip(lats, lons)]
+            zipped_coords.append([lats[0], lons[0]])
+            predict_json['coordinates'].append(zipped_coords)
+    return gen_geojson(predict_json, tif_path)
 
             # Get global coordinates from pixel x, y coords
             projected_x = a * y + b * x + xoff
