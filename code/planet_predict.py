@@ -205,18 +205,82 @@ def predict(tif_path, model):
     return filter_predictions(predict_json)
 
 
-def filter_predictions(predict_json):
-    predictions = MultiPoint(predict_json['coordinates'])
+def filter_predictions(predict_json, tif_path):
+    # if predict_json['coordinates'] != []:
+    predictions = MultiPolygon([Polygon(vertices) for vertices in predict_json['coordinates']])
     new_predictions = deepcopy(predict_json)
     new_predictions['coordinates'] = []
-    with fiona.open(WATERBODY_JSON) as water_geoms:
-        for pol in water_geoms:
-            water_features = shape(pol['geometry'])
-            for point in predictions:
-                if point.within(water_features):
-                    new_predictions['coordinates'].append([point.x, point.y])
-    return new_predictions
+    geojson_schema = {
+                  "type": "FeatureCollection",
+                  "features": []
+    }
 
+    tif_path = os.path.basename(tif_path)
+    rowcol, date = tif_path.split('_')
+    date = date.split('T')[0]
+    from fiona.crs import from_epsg
+    with fiona.open(WATERBODY_JSON) as water_geoms:
+        for idx, point in enumerate(predictions):
+            idx = f'{rowcol}i{idx}'
+
+            shapefile_path = f'./shapes/{idx}_{date}'
+            print(shapefile_path, tif_path)
+            opts = {
+                'schema': {'geometry': 'Polygon', 'properties': {}}
+            }
+
+            # for pol in water_geoms:
+            #     water_features = shape(pol['geometry'])
+            #     if point.within(water_features):
+            lng1, lat1, lng2, lat2 = point.bounds
+            shape_json = mapping(point)
+            poly = [
+                        [
+                        [
+                            lng1,
+                            lat1
+                        ],
+                        [
+                            lng2,
+                            lat1
+                        ],
+                        [
+                            lng2,
+                            lat2
+                        ],
+                        [
+                            lng1,
+                            lat2
+                        ],
+                        [
+                            lng1,
+                            lat1
+                        ]
+                        ]
+                    ]
+            # shapefile.write({
+            #     'geometry': {'type':'Polygon', 'coordinates': poly} , 'properties': {}}
+            # )
+            # file_list = glob(f'{shapefile_path}.*')
+            # zipObj = ZipFile(f'{shapefile_path}.zip', 'w')
+            # [zipObj.write(file, os.path.basename(file)) for file in file_list]
+            # zipObj.close()
+            print('poly', poly)
+            geojson_schema['features'] = [{"type": "Feature",
+                    "properties": {},'geometry': {'type':'Polygon', 'coordinates': predict_json['coordinates']}}]
+            with open(f'{shapefile_path}.geojson', 'w') as shapefile:
+                json.dump(geojson_schema, shapefile)
+            args = ['ogr2ogr', '-f', 'ESRI Shapefile', f'{shapefile_path}.shp', f'{shapefile_path}.geojson']
+            subprocess.call(args)
+            file_list = set(glob(f'{shapefile_path}.*'))
+            file_list -= set([f'{shapefile_path}.geojson'])
+            file_list = list(file_list)
+            zip_filename = f'{shapefile_path.replace(".tif", "")}.zip'
+            zipObj = ZipFile(f'{shapefile_path}.zip', 'w')
+            [zipObj.write(file, os.path.basename(file)) for file in file_list]
+            zipObj.close()
+            new_predictions['coordinates'].append(point)
+#return new_predictions
 
 def get_predictions(tif_path, seg_model):
     predict_json_list = []
