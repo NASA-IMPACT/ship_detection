@@ -68,6 +68,88 @@ def read_resize_img(tif_path, dim=(768, 768)):
     return (cv2.resize(img, dim), ds.meta)
 
 
+def predict_batch(tifs_path, model) -> list:
+    """
+    tifs_path: path to tifs to batch predict
+    model: model to use for prediction
+    returns: list of predictions in geojson format
+    """
+    image_collection = ImageCollection(
+        tifs_path + '/*.tif',
+        load_func=read_resize_img
+    )
+    ic_batches = np.array_split(
+        image_collection,
+        int(len(image_collection) / 9)
+    )
+    #  it returns l % n sub-arrays of size l//n + 1 and the rest of size l//n.
+
+    for ic_batch in ic_batches:
+        # make sure each batch is the same size, discard the last few iamges if
+        # necessary
+        if len(ic_batch) is not 9:
+            ic_batch = ic_batch[:9]
+
+    segments_list = []
+    meta_list = []
+    geojsons = []
+    for idx, batch in enumerate(ic_batches):
+
+        images, metas = zip(*batch)
+        batch_segments = predict_rcnn(
+            model, images
+        )
+        segments_list += batch_segments
+        meta_list += metas
+
+    with Pool(processes=4) as pool:
+        geojsons = pool.starmap(
+            mask_to_geojson,
+            zip(segments_list, meta_list)
+        )
+
+
+def mask_to_geojson(segment, meta):
+    """
+    batch_segments: list of segmentation masks
+    num_threads: number of threads to use for creating geojsons
+    """
+    predict_json = {
+        "TYPE": "MultiPolygon",
+        "coordinates": [],
+    }
+
+    segment = (segment > 125).astype('uint8')
+    w_0, h_0 = meta['width'], meta['height']
+    segment = cv2.resize(segment, (w_0, h_0))  # reshape to original
+    contours = cv2.findContours(
+        segment,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
+    contours = contours[0] if len(contours) == 2 else contours[1]
+
+    for idx, contour in enumerate(contours):
+        if not (ship.area >= SHIP_AREA_MIN and ship.area <= SHIP_AREA_MAX):
+            # if the contour is too small or large to be a ship, ignore it
+            continue
+        rect = cv2.minAreaRect(contour)
+        box = cv2.boxPoints(rect)
+        box = [[y, x] for x, y in box]
+        boxpoints = zip(*box)
+        xs, ys = rasterio.transform.xy(meta['transform'], *boxpoints)
+        lats, lons = fiona.transform.transform(
+            ds.crs.to_proj4(),
+            '+init=epsg:4326',
+            xs,
+            ys
+        )
+        zipped_coords = [[lat, lon] for lat, lon in zip(lats, lons)]
+        zipped_coords.append([lats[0], lons[0]])
+        predict_json['coordinates'].append(zipped_coords)
+    return gen_geojson(predict_json)
+
+
 def predict(tif_path, model):
 
     predict_json = {
