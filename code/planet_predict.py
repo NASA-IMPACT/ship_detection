@@ -1,38 +1,58 @@
-import os
-import os.path
-import os
-from itertools import product
-import rasterio as rio
 import cv2
-import numpy as np
 import fiona
-import rasterio
+import fiona.transform
+import json
 import matplotlib.pyplot as plt
+import numpy as np
+import os
+import rasterio
+import rasterio as rio
+import skimage.transform as st
+import subprocess
 
-from rasterio import windows
-from keras.models import load_model
+from copy import deepcopy
 from glob import glob
-from osgeo import gdal, osr, ogr
-from rasterio.warp import calculate_default_transform, reproject, Resampling
+from itertools import product
+from rasterio import windows
+from rasterio.crs import CRS
+from rasterio.windows import Window
+from skimage.io import ImageCollection
+from skimage.measure import regionprops
 from skimage.segmentation import felzenszwalb
 from skimage.segmentation import mark_boundaries
-from skimage.measure import regionprops
-from copy import deepcopy
-from shapely.geometry import (
-    shape, mapping, Point, Polygon, MultiPolygon, MultiPoint
+from tensorflow.keras.models import load_model
+from zipfile import ZipFile
+from keras.preprocessing.image import ImageDataGenerator
+from multiprocessing import Pool
+
+from rasterio.warp import (
+    aligned_target
+    calculate_default_transform,
+    reproject,
+    Resampling,
 )
+from shapely.geometry import (
+    mapping
+    mapping,
+    MultiPoint,
+    MultiPolygon,
+    Point,
+    Polygon,
+    shape,
+)
+
 from models import (
-    dice_p_bce,
     dice_coef,
-    true_positive_rate,
+    dice_p_bce,
     IoU,
     make_model_rcnn,
-    predict_rcnn,
+    predict_rcnn
+    true_positive_rate,
 )
 from config import (
-    WATERBODY_JSON,
     IMG_DIM,
     THRESHOLD
+    WATERBODY_JSON,
 )
 
 
