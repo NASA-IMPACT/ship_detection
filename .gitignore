@@ -1,0 +1,5 @@
+*.tif
+data
+files
+downloaded_files
+*.pyc
