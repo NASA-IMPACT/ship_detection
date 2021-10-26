@@ -5,15 +5,19 @@ import rasterio
 import requests
 import subprocess
 
+from dotenv import load_dotenv
 from glob import glob
 from rasterio.io import MemoryFile
 from rasterio.warp import reproject, calculate_default_transform, Resampling
 from zipfile import ZipFile
 
+env_vars = load_dotenv()
+
 BASE_URL = "https://api.labeler.nasa-impact.net"
 
-CLIENT_ID = "TlrtevKVVQtSNBtrFrZtQiOSvVdjeUQzo2IsnYNv"
-CLIENT_SECRET = "uKvfcTWRnS74L0DlawGIilP1Lgv8vloHopFR6jnxcWEPSg2SFYnEES6dRBw4ldP2taCoMeVsA15sl8bPbxoERSITC4CJrA84OrpWaaQHiYKmTLIQQa1B4TZqaIWPqW7m"
+
+CLIENT_ID = env_vars["CLIENT_ID"]
+CLIENT_SECRET = env_vars["CLIENT_SECRET"]
 
 DEFAULT_CRS = 'EPSG:4326'
 
