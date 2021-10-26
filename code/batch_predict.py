@@ -29,7 +29,10 @@ def planet_preprocess(
 
     image_paths = get_images_paths(planet_path, format_type='tif')
     pool = Pool(cpu_count())
-    for _ in tqdm(pool.imap_unordered(create_tiles_wgs84, image_paths)):
+
+    for _ in tqdm(pool.imap_unordered(
+        create_tiles_wgs84,
+        [(image_path, output_path) for image_path in image_paths])):
         # this is to make tqdm work with pool mapping to track progress
         pass
     pool.join()
@@ -64,13 +67,14 @@ def planet_predict(
     :return: None
     """
     scene_paths = glob(processed_images_path + '/*')
+
     for scene in tqdm(scene_paths):
         rcnn_model = make_model_rcnn()
         predict_batch(scene, rcnn_model)
 
 if __name__ == '__main__':
     planet_preprocess(
-        '/home/ubuntu/ship_detection/files/PSScene3Band',
-        output_path='/home/ubuntu/ship_detection/data/temp'
+        '/home/ubuntu/ship_detection/data/files/PSScene3Band',
+        output_path='/home/ubuntu/ship_detection/data/la/temp'
     )
-    planet_predict('/home/ubuntu/ship_detection/data/temp')
+    planet_predict('/home/ubuntu/ship_detection/data/la/temp')
