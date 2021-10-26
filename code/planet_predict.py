@@ -149,16 +149,13 @@ def mask_to_geojson(segment, meta):
     contours = contours[0] if len(contours) == 2 else contours[1]
 
     for idx, contour in enumerate(contours):
-        if not (ship.area >= SHIP_AREA_MIN and ship.area <= SHIP_AREA_MAX):
-            # if the contour is too small or large to be a ship, ignore it
-            continue
         rect = cv2.minAreaRect(contour)
         box = cv2.boxPoints(rect)
         box = [[y, x] for x, y in box]
         boxpoints = zip(*box)
         xs, ys = rasterio.transform.xy(meta['transform'], *boxpoints)
         lats, lons = fiona.transform.transform(
-            ds.crs.to_proj4(),
+            meta['crs'].to_proj4(),
             '+init=epsg:4326',
             xs,
             ys
@@ -191,8 +188,6 @@ def predict(tif_path, model):
         contours = cv2.findContours(segments,  cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = contours[0] if len(contours) == 2 else contours[1]
         for idx, contour in enumerate(contours):
-
-            #if (ship.area >= SHIP_AREA_MIN and ship.area <= SHIP_AREA_MAX):
             rect = cv2.minAreaRect(contour)
             box = cv2.boxPoints(rect)
             box = [[y, x] for x, y in box]
@@ -235,7 +230,7 @@ def gen_geojson(predict_json):
                 "type": "Feature",
                 "properties": {},
                 "geometry": polygon
-                }
+            }
         )
 
     return geojson_schema
@@ -310,7 +305,6 @@ def get_predictions(tif_path, seg_model):
     predict_json_list = []
 
     tile_path = create_tiles(tif_path)
-    # tile_path = f'../data/temp/tiled_{os.path.basename(tif_path)}/'
     for tile in glob(tile_path + '/*.tif'):
         print(tile)
         predict_json_list.append(predict(tile, seg_model))
@@ -321,7 +315,6 @@ def create_tiles(tif_image, scale=1.5):
     out_path = f'../data/temp/tiled_{os.path.basename(tif_image)}/'
     tif_path = os.path.basename(tif_image)
     tif_path = tif_path[:8]
-    # import ipdb; ipdb.set_trace()
     date = tif_path.split('_')[0]
     if not os.path.exists(out_path):
         os.makedirs(out_path)
@@ -361,7 +354,7 @@ def create_tiles_wgs84(args):
             dst_transform, width, height = calculate_default_transform(
             src.crs, dst_crs, window.width, window.height, *rasterio.windows.bounds(window, transform))
 
-        meta_4326.update({
+            meta_4326.update({
                 'crs': src.crs,
                 'transform': transform,
                 'width': window.width,
