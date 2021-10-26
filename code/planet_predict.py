@@ -341,55 +341,34 @@ def create_tiles(tif_image, scale=1.5):
     return out_path
 
 
-def create_tiles_wgs84(tif_image):
-
-    dst_crs = 'EPSG:4326'
-    out_path = f'../data/temp/{os.path.basename(tif_image)}_tile/'
-    out_path_4326 = f'../data/temp/{os.path.basename(tif_image)}_tile_4326/'
+def create_tiles_wgs84(args):
+    tif_image = args[0]
+    out_path = args[1]
+    dst_crs = CRS({'init': 'EPSG:4326'})
+    out_path = f'{out_path}/{os.path.basename(tif_image)}_tile/'
+    out_path_4326 = out_path
     tif_path = os.path.basename(tif_image)
     tif_path = tif_path[:8]
     date = tif_path.split('_')[0]
-    if not os.path.exists(out_path):
-        os.makedirs(out_path)
+
     if not os.path.exists(out_path_4326):
         os.makedirs(out_path_4326)
     output_filename = '{}x{}_{}T000000.tif'
-    with rio.open(tif_image) as src:
-        transform, width, height = calculate_default_transform(
-            src.crs, dst_crs, src.width, src.height, *src.bounds)
-        tile_width, tile_height = IMG_DIM, IMG_DIM
 
-        meta = src.meta.copy()
+    with rio.open(tif_image) as src:
         meta_4326 = src.meta.copy()
+        for window, transform in get_tiles(src.meta, IMG_DIM, IMG_DIM):
+            dst_transform, width, height = calculate_default_transform(
+            src.crs, dst_crs, window.width, window.height, *rasterio.windows.bounds(window, transform))
+
         meta_4326.update({
-                'crs': dst_crs,
+                'crs': src.crs,
                 'transform': transform,
-                'width': width,
-                'height': height,
+                'width': window.width,
+                'height': window.height,
                 'count': 3,
                 'nodata': 0,
             })
-        with rio.open(tif_image[:-4]+'_4326.tif', 'w', **meta_4326) as dest_4326:
-            for i in range(1, 4):
-                reproject(
-                    source=rasterio.band(src, i),
-                    destination=rasterio.band(dest_4326, i),
-                    src_transform=src.transform,
-                    src_crs=src.crs,
-                    dst_transform=transform,
-                    dst_crs=dst_crs,
-                    resampling=Resampling.nearest
-                )
-
-        for window, transform in get_tiles(src, tile_width, tile_height):
-            dst_transform, width, height = calculate_default_transform(
-            src.crs, dst_crs, window.width, window.height, *rasterio.windows.bounds(window, transform))
-            meta['transform'] = transform
-            meta['width'], meta['height'] = window.width, window.height
-            meta_4326['transform'] = dst_transform
-            meta_4326['width'], meta_4326['height'] = width, height
-            outpath = os.path.join(out_path, output_filename.format(
-                window.col_off, window.row_off, date))
             outpath_4326 = os.path.join(out_path_4326, output_filename.format(
                 window.col_off, window.row_off, date))
             # with rio.open(outpath, 'w', **meta) as outds:
