@@ -94,7 +94,7 @@ def make_model_rcnn():
 
     class InferenceConfig(DetectorConfig):
         GPU_COUNT = 1
-        IMAGES_PER_GPU = 9
+        IMAGES_PER_GPU = BATCH_SIZE
 
     import tensorflow as tf
     inference_config = InferenceConfig()
@@ -112,11 +112,14 @@ def predict_rcnn(model, img):
     predictions = model.detect(img)
     masks =  [pred['masks'] for pred in predictions]
     appended_masks = []
-    for mask in masks:
+
+    formask in masks:
+
         if mask.shape[2] == 0:
             appended_masks.append(np.zeros((mask.shape[0], mask.shape[1])))
         else:
             appended_masks.append((np.sum(mask, axis=-1) > 0) * 255)
+
     return appended_masks
 
 def make_model(input_shape):
