@@ -12,6 +12,8 @@ float_pat = compile(r'^-?\d+\.\d+(e-?\d+)?$')
 charfloat_pat = compile(r'^[\[,\,]-?\d+\.\d+(e-?\d+)?$')
 precision = 6
 
+env_vars = load_dotenv()
+
 def merge_geojsons(input_folder, outfile):
 
     infiles = glob.glob(input_folder + '/*.geojson')
@@ -48,7 +50,7 @@ def merge_geojsons(input_folder, outfile):
 
 def upload_to_il():
 
-    uploader = Uploader("admin", "4ubzRCR5ANwcBy2")
+    uploader = Uploader(env_vars['IL_USERNAME'], env_vars['IL_PASSWORD'])
     for geojson in glob.glob('combined_geojsons/la/*.geojson'):
         shapefile_name = geojson.replace('.geojson', '')
         gdf = gpd.read_file(geojson)
