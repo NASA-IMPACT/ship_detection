@@ -217,33 +217,31 @@ def save_preds(img, preds):
 
 def gen_geojson(predict_json):
 
-    #tif_path = os.path.basename(tif_path)
-    # rowcol, date = tif_path.split('_')
-    # date = date.split('T')[0]
     geojson_schema = {
                   "type": "FeatureCollection",
                   "features": []
     }
     for idx, detection in enumerate(predict_json['coordinates']):
-
-        #geojson_path = f'./shapes/{idx}_{rowcol}'
-        geojson_schema['features'] = [
-            {
-                "type": "Feature",
-                "properties": {},
-                "geometry": {
+        polygon = {
                     "type":"Polygon",
                     "coordinates": [detection]
                 }
-            }
-        ]
+        area_m2 = area(polygon)
+        if not (area_m2 >= SHIP_AREA_MIN and area_m2 <= SHIP_AREA_MAX):
+            # if the contour is too small or large to be a ship, ignore it
+           continue
+        geojson_schema['features'].append(
+            {
+                "type": "Feature",
+                "properties": {},
+                "geometry": polygon
+                }
+        )
 
-        # with open(f'{geojson_path}.geojson', 'w') as shapefile:
-        #     json.dump(geojson_schema, shapefile)
     return geojson_schema
 
 def filter_predictions(predict_json, tif_path):
-    # if predict_json['coordinates'] != []:
+
     predictions = MultiPolygon([Polygon(vertices) for vertices in predict_json['coordinates']])
     new_predictions = deepcopy(predict_json)
     new_predictions['coordinates'] = []
@@ -261,14 +259,10 @@ def filter_predictions(predict_json, tif_path):
             idx = f'{rowcol}i{idx}'
 
             shapefile_path = f'./shapes/{idx}_{date}'
-            print(shapefile_path, tif_path)
+
             opts = {
                 'schema': {'geometry': 'Polygon', 'properties': {}}
             }
-
-            # for pol in water_geoms:
-            #     water_features = shape(pol['geometry'])
-            #     if point.within(water_features):
             lng1, lat1, lng2, lat2 = point.bounds
             shape_json = mapping(point)
             poly = [
@@ -310,7 +304,7 @@ def filter_predictions(predict_json, tif_path):
             [zipObj.write(file, os.path.basename(file)) for file in file_list]
             zipObj.close()
             new_predictions['coordinates'].append(point)
-#return new_predictions
+    return new_predictions
 
 def get_predictions(tif_path, seg_model):
     predict_json_list = []
