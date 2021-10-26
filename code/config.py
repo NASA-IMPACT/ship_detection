@@ -1,6 +1,6 @@
 
 AUGMENT_BRIGHTNESS = False
-BATCH_SIZE = 16
+BATCH_SIZE = 9
 EDGE_CROP = 16
 EXTENTS = {
     'san_fran': [-123.43, 37.71, -123.30, 37.85]
@@ -22,7 +22,6 @@ PRETRAINED = PATH + 'fine-tuning-resnet34-on-ship-detection/models/Resnet34_labl
 SEGMENTATION_PATH = PATH + 'train_ship_segmentations_v2.csv'
 TEST_PATH = PATH + 'test_v2/'
 THRESHOLD = 0.5
-TILE_SIZE = 256
 TRAIN_PATH = PATH + 'train_v2/'
 UPSAMPLE_MODE = 'SIMPLE'
 WATERBODY_JSON = '../../ship_detection_2/data/stanford-sf-geojson.geojson'
@@ -33,3 +32,6 @@ THRESHOLD = 0.5
 VALID_IMG_COUNT = 900
 ZOOM_LEVEL = 14  # 16 is in pixel resolution == 2.4m
 
+
+SHIP_AREA_MIN = 4000
+SHIP_AREA_MAX = 50000
