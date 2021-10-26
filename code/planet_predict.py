@@ -371,34 +371,31 @@ def create_tiles_wgs84(args):
             })
             outpath_4326 = os.path.join(out_path_4326, output_filename.format(
                 window.col_off, window.row_off, date))
-            # with rio.open(outpath, 'w', **meta) as outds:
-            #     outds.write(src.read(window=window))
-            with rio.open(outpath_4326, 'w', **meta_4326) as outds2:
+
+            with rio.open(outpath_4326, 'w', **meta_4326) as outds:
                 for i in range(1, 4):
                     reproject(
-                        source=src.read(i),
-                        destination=rasterio.band(outds2, i),
-                        src_transform=src.transform,
+                        source=src.read(i, window=window),
+                        destination=rasterio.band(outds, i),
+                        src_transform=transform,
                         src_crs=src.crs,
-                        dst_transform=dst_transform,
-                        dst_crs=dst_crs,
                         resampling=Resampling.nearest
                     )
     return out_path_4326
 
 
-def get_tiles(ds, width, height):
-    ncols, nrows = ds.meta['width'], ds.meta['height']
+def get_tiles(meta, width, height):
+    ncols, nrows = meta['width'], meta['height']
+    big_window = windows.Window(col_off=0, row_off=0, width=ncols, height=nrows)
     offsets = product(range(0, ncols, width), range(0, nrows, height))
-    big_window = windows.Window(
-        col_off=0, row_off=0, width=ncols, height=nrows)
     for col_off, row_off in offsets:
         window = windows.Window(
             col_off=col_off,
             row_off=row_off,
             width=int(width),
             height=int(height)).intersection(big_window)
-        transform = windows.transform(window, ds.transform)
+
+        transform = windows.transform(window, meta['transform'])
         yield window, transform
 
 
