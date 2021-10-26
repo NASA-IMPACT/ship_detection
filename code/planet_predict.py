@@ -91,33 +91,41 @@ def predict_batch(tifs_path, model) -> list:
     )
     ic_batches = np.array_split(
         image_collection,
-        int(len(image_collection) / 9)
+        int(len(image_collection) / BATCH_SIZE)
     )
     #  it returns l % n sub-arrays of size l//n + 1 and the rest of size l//n.
-
-    for ic_batch in ic_batches:
-        # make sure each batch is the same size, discard the last few iamges if
-        # necessary
-        if len(ic_batch) is not 9:
-            ic_batch = ic_batch[:9]
 
     segments_list = []
     meta_list = []
     geojsons = []
     for idx, batch in enumerate(ic_batches):
-
+        if len(batch) is not BATCH_SIZE:
+            batch = batch[:BATCH_SIZE]
         images, metas = zip(*batch)
         batch_segments = predict_rcnn(
             model, images
         )
         segments_list += batch_segments
         meta_list += metas
-
+        del batch_segments
     with Pool(processes=4) as pool:
         geojsons = pool.starmap(
             mask_to_geojson,
             zip(segments_list, meta_list)
         )
+        pool.close()
+        gc.collect()
+
+    if not os.path.exists(f'./shapes/{os.path.basename(tifs_path)}'):
+        os.mkdir(f'./shapes/{os.path.basename(tifs_path)}')
+
+    for idx, geojson in enumerate(geojsons):
+        if geojson['features'] != []:
+
+            with open(
+                f'./shapes/{os.path.basename(tifs_path)}/{idx}.geojson', 'w'
+                ) as shapefile:
+                json.dump(geojson, shapefile)
 
 
 def mask_to_geojson(segment, meta):
