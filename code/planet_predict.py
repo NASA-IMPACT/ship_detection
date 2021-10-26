@@ -1,6 +1,7 @@
 import cv2
 import fiona
 import fiona.transform
+import gc
 import json
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,9 +11,11 @@ import rasterio as rio
 import skimage.transform as st
 import subprocess
 
+from area import area
 from copy import deepcopy
 from glob import glob
 from itertools import product
+from datetime import datetime
 from rasterio import windows
 from rasterio.crs import CRS
 from rasterio.windows import Window
@@ -20,19 +23,20 @@ from skimage.io import ImageCollection
 from skimage.measure import regionprops
 from skimage.segmentation import felzenszwalb
 from skimage.segmentation import mark_boundaries
+from PIL import Image
 from tensorflow.keras.models import load_model
 from zipfile import ZipFile
 from keras.preprocessing.image import ImageDataGenerator
 from multiprocessing import Pool
 
 from rasterio.warp import (
-    aligned_target
+    aligned_target,
     calculate_default_transform,
     reproject,
     Resampling,
 )
 from shapely.geometry import (
-    mapping
+    mapping,
     mapping,
     MultiPoint,
     MultiPolygon,
@@ -46,13 +50,16 @@ from models import (
     dice_p_bce,
     IoU,
     make_model_rcnn,
-    predict_rcnn
+    predict_rcnn,
     true_positive_rate,
 )
 from config import (
     IMG_DIM,
-    THRESHOLD
+    THRESHOLD,
     WATERBODY_JSON,
+    BATCH_SIZE,
+    SHIP_AREA_MIN,
+    SHIP_AREA_MAX,
 )
 
 
@@ -65,7 +72,11 @@ def read_resize_img(tif_path, dim=(768, 768)):
     ds = rasterio.open(tif_path, 'r')
     img = ds.read([1, 2, 3]) # just read first three bands
     img = np.moveaxis(img, 0, -1)
-    return (cv2.resize(img, dim), ds.meta)
+    ds.close()
+    meta = ds.meta
+    del ds
+    gc.collect()
+    return (cv2.resize(img, dim), meta)
 
 
 def predict_batch(tifs_path, model) -> list:
