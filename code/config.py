@@ -32,6 +32,7 @@ THRESHOLD = 0.5
 VALID_IMG_COUNT = 900
 ZOOM_LEVEL = 14  # 16 is in pixel resolution == 2.4m
 
-
+# Ship geometry parameters to filter in the predictions
 SHIP_AREA_MIN = 4000
 SHIP_AREA_MAX = 50000
+MAX_ASPECT_RATIO = 0.20

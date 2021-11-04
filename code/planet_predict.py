@@ -60,6 +60,7 @@ from config import (
     BATCH_SIZE,
     SHIP_AREA_MIN,
     SHIP_AREA_MAX,
+    MAX_ASPECT_RATIO,
 )
 
 
@@ -150,6 +151,10 @@ def mask_to_geojson(segment, meta):
 
     for idx, contour in enumerate(contours):
         rect = cv2.minAreaRect(contour)
+        sides = rect[1]
+        # check for aspect ratio
+        if min(sides) / max(sides) > MAX_ASPECT_RATIO:
+            continue
         box = cv2.boxPoints(rect)
         box = [[y, x] for x, y in box]
         boxpoints = zip(*box)
