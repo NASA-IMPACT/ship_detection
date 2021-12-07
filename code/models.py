@@ -1,12 +1,12 @@
 import matplotlib
-matplotlib.use('agg')
 import numpy as np
 import matplotlib.pyplot as plt
-import tensorflow.keras.backend as K
-from tensorflow.keras import models, layers
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.losses import binary_crossentropy
-from tensorflow.keras.models import load_model
+import keras.backend as K
+
+from keras import models, layers
+from keras.optimizers import Adam
+from keras.losses import binary_crossentropy
+from keras.models import load_model
 from config import (
     UPSAMPLE_MODE,
     NET_SCALING,
@@ -16,10 +16,11 @@ from config import (
     MAX_TRAIN_STEPS,
     BATCH_SIZE,
     VALID_IMG_COUNT,
-    NB_EPOCHS
+    NB_EPOCHS,
+    IMG_SIZE
 )
 
-from tensorflow.keras.callbacks import (
+from keras.callbacks import (
     ModelCheckpoint,
     LearningRateScheduler,
     EarlyStopping,
@@ -50,6 +51,76 @@ def upsample_conv(filters, kernel_size, strides, padding):
 def upsample_simple(filters, kernel_size, strides, padding):
     return layers.UpSampling2D(strides)
 
+
+def make_model_rcnn():
+    from mrcnn.config import Config
+    from mrcnn import utils
+    import mrcnn.model as modellib
+    from mrcnn import visualize
+    from mrcnn.model import log
+
+    model_path = '../mask_rcnn_airbus_0022.h5'
+    class DetectorConfig(Config):
+        # Give the configuration a recognizable name
+        NAME = 'airbus'
+
+        GPU_COUNT = 1
+        IMAGES_PER_GPU = 9
+
+        BACKBONE = 'resnet50'
+
+        NUM_CLASSES = 2  # background and ship classes
+
+        IMAGE_MIN_DIM = 384
+        IMAGE_MAX_DIM = 384
+        RPN_ANCHOR_SCALES = (8, 16, 32, 64)
+        TRAIN_ROIS_PER_IMAGE = 64
+        MAX_GT_INSTANCES = 14
+        DETECTION_MAX_INSTANCES = 10
+        DETECTION_MIN_CONFIDENCE = 0.95
+        DETECTION_NMS_THRESHOLD = 0.0
+
+        STEPS_PER_EPOCH = 15
+        VALIDATION_STEPS = 10
+
+        ## balance out losses
+        LOSS_WEIGHTS = {
+            "rpn_class_loss": 30.0,
+            "rpn_bbox_loss": 0.8,
+            "mrcnn_class_loss": 6.0,
+            "mrcnn_bbox_loss": 1.0,
+            "mrcnn_mask_loss": 1.2
+        }
+
+    class InferenceConfig(DetectorConfig):
+        GPU_COUNT = 1
+        IMAGES_PER_GPU = BATCH_SIZE
+
+    import tensorflow as tf
+    inference_config = InferenceConfig()
+
+    # Recreate the model in inference mode
+    model = modellib.MaskRCNN(mode='inference',
+                              config=inference_config,
+                              model_dir='../data/')
+    model.load_weights(model_path, by_name=True)
+
+    return model
+
+
+def predict_rcnn(model, img):
+    predictions = model.detect(img)
+    masks =  [pred['masks'] for pred in predictions]
+    appended_masks = []
+
+    formask in masks:
+
+        if mask.shape[2] == 0:
+            appended_masks.append(np.zeros((mask.shape[0], mask.shape[1])))
+        else:
+            appended_masks.append((np.sum(mask, axis=-1) > 0) * 255)
+
+    return appended_masks
 
 def make_model(input_shape):
     if UPSAMPLE_MODE == 'DECONV':
@@ -197,7 +268,13 @@ def main():
         plt.savefig(f'{i}.png')
 
 
-def predict():
+def load_from_path(weight_file_path):
+    seg_model = make_model((1, IMG_SIZE, IMG_SIZE, 3))
+    seg_model.load_weights(weight_file_path)
+    return seg_model
+
+
+def predict(weight_file_path):
     from data_process import (
         gen_data,
         create_aug_gen,
@@ -205,23 +282,8 @@ def predict():
     )
     train_data, val_data = gen_data()
     valid_x, valid_y = next(make_image_gen(train_data, VALID_IMG_COUNT))
-    seg_model = load_model(
-        weight_path,
-        custom_objects={
-            'dice_p_bce': dice_p_bce,
-            'dice_coef': dice_coef,
-            'true_positive_rate': true_positive_rate,
-            'IoU': IoU,
-        }
-    )
-    # seg_model = load_model(
-    #     weight_path,
-    #     custom_objects={
-    #         'IoU': IoU,
-    #     }
-    # )
-    weights="../models/{}_iou_weights.orig.hdf5".format('seg_model')
-    seg_model.load_weights(weights)
+
+
     pred_y = seg_model.predict(valid_x)
     import ipdb; ipdb.set_trace()
     for i in range(400):
@@ -236,6 +298,6 @@ def predict():
         plt.savefig(f'../data/predictions/{i}.png')
 
 
-if __name__ == '__main__':
-    # main()
-    predict()
+# if __name__ == '__main__':
+#     # main()
+#     # predict()
